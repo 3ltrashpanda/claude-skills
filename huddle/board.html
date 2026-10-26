@@ -3,7 +3,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&display=swap">
 <style>
-/* Layout: summary strip, then the work board (five lanes that wrap), then the idea review list with filters. */
+/* Layout: sticky status strip, then three groups by who has the ball (Your move / Claude's move / Done & parked).
+   A card's lane is a chip on the card, not a column. Ideas are cards in the same groups. */
 :root {
   --bg: #f6f7f5; --surface: #ffffff; --sunk: #eef0ee; --ink: #1a1e1c; --muted: #5d6662; --line: #dfe3e0;
   --accent: #2f4fd1; --accent-soft: #e6eafb;
@@ -27,66 +28,99 @@
 }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--font-body); }
-.wrap { max-width: 1320px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 32px; }
+.wrap { max-width: 1100px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 24px; }
 header { display: grid; gap: 8px; }
 .eyebrow { font: 500 12px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 h1 { font: 500 clamp(30px, 5vw, 42px)/1.1 var(--font-display); margin: 0; text-wrap: balance; }
-h2 { font: 500 26px/1.2 var(--font-display); margin: 0; }
+h2 { font: 500 24px/1.2 var(--font-display); margin: 0; }
 h3 { font: 600 15px/1.35 var(--font-body); margin: 0; text-wrap: balance; }
+h4 { font: 600 11.5px/1 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin: 0; }
 p { margin: 0; }
 .lede { color: var(--muted); max-width: 70ch; }
-.strip { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); padding-block: 10px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Sticky strip */
+.strip { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); padding-block: 10px; display: grid; gap: 8px; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+.strip .line { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
 .strip b { color: var(--ink); font-weight: 600; }
-.strip .you { color: var(--warn); }
-.strip .you b { color: var(--warn); }
-.strip a { color: inherit; }
-.status-msg { flex-basis: 100%; }
-.sec-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
-.sec-head p { color: var(--muted); max-width: 70ch; }
-/* Board */
-.board { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; align-items: start; }
-.lane { background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 8px; min-width: 0; }
-.lane-head { display: flex; align-items: center; gap: 8px; padding: 2px 2px 4px; }
-.lane-head h3 { font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
-.lane-head .n { margin-left: auto; font: 500 12px/1 var(--font-mono); color: var(--muted); }
-.swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.empty { font-size: 13px; color: var(--muted); padding: 6px 4px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+.linkbtn { font: 600 13px/1.2 var(--font-body); background: none; border: 0; padding: 4px 0; color: var(--ink); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.linkbtn.you { color: var(--warn); }
+.warnt { color: var(--warn); }
+.status-msg { color: var(--muted); }
+.lanechips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font: 500 12px/1 var(--font-body); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; font-variant-numeric: tabular-nums; }
+.chip b { color: var(--ink); }
+/* Groups */
+.groups { display: grid; gap: 22px; }
+details.group { background: var(--sunk); border: 1px solid var(--line); border-radius: 12px; padding: 4px 14px 14px; }
+details.group > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 10px; padding: 12px 0 8px; }
+details.group > summary::-webkit-details-marker { display: none; }
+details.group > summary::before { content: "▸"; color: var(--muted); font-size: 13px; transition: none; }
+details.group[open] > summary::before { content: "▾"; }
+details.group > summary h2 { flex: 0 0 auto; }
+details.group > summary .gcount { font: 500 13px/1 var(--font-mono); color: var(--muted); }
+details.group > summary .gnote { font-size: 13px; color: var(--muted); margin-left: auto; text-align: right; }
+details.group.you { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+.sub { display: grid; gap: 10px; margin-top: 10px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 12px; align-items: start; }
+.empty { font-size: 14px; color: var(--muted); padding: 8px 2px; }
+/* Cards (work cards and idea cards share this shell) */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; min-width: 0; scroll-margin-top: 140px; }
+.card:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
 .card.needs { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); box-shadow: inset 3px 0 0 var(--warn); }
+.card.flash { outline: 2px solid var(--warn); outline-offset: 2px; }
+.card .top { display: flex; gap: 8px; align-items: start; justify-content: space-between; }
 .card .meta { display: flex; flex-wrap: wrap; gap: 4px 8px; font: 12px/1.3 var(--font-mono); color: var(--muted); }
-.card .detail { font-size: 13.5px; color: var(--muted); overflow-wrap: anywhere; }
-.pill { display: inline-flex; align-items: center; gap: 4px; font: 500 11.5px/1 var(--font-body); padding: 4px 8px; border-radius: 999px; background: var(--later-soft); color: var(--later); white-space: nowrap; }
+.card .detail, .card .pitch { font-size: 13.5px; color: var(--muted); overflow-wrap: anywhere; }
+.card h3 { overflow-wrap: anywhere; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 5px; font: 500 11.5px/1 var(--font-body); padding: 5px 8px; border-radius: 999px; background: var(--later-soft); color: var(--later); white-space: nowrap; }
+.pill.lane { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .05em; font-size: 10.5px; }
 .pill.you { background: var(--warn-soft); color: var(--warn); }
 .pill.ok { background: var(--ok-soft); color: var(--ok); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
 .pill.q { background: var(--accent-soft); color: var(--accent); }
-.more { font: 500 12.5px/1 var(--font-body); background: none; border: 0; color: var(--accent); cursor: pointer; padding: 6px 4px; justify-self: start; }
-details.card-x summary { cursor: pointer; font-size: 12.5px; color: var(--accent); list-style: none; }
-details.card-x summary::-webkit-details-marker { display: none; }
+.pill.park { background: var(--later-soft); color: var(--later); border: 1px dashed color-mix(in srgb, var(--later) 45%, var(--line)); }
+.pill.stale { background: var(--bad-soft); color: var(--bad); }
+.pill.quiet { background: var(--warn-soft); color: var(--warn); }
+.pill.live { background: var(--ok-soft); color: var(--ok); }
+.pill.none { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
+.needs-ask { background: var(--warn-soft); border-radius: 6px; padding: 8px 10px; display: grid; gap: 3px; }
+.needs-ask .lbl { font: 600 10.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--warn); }
+.needs-ask .ask { font-size: 13.5px; color: var(--ink); overflow-wrap: anywhere; }
+.asks { padding: 8px 10px; border-radius: 6px; background: var(--accent-soft); color: var(--ink); font-size: 13.5px; }
+.asks b { color: var(--accent); }
+.lock { font-size: 13px; color: var(--muted); padding: 6px 8px; background: var(--sunk); border-radius: 6px; }
+.readline { font-size: 12.5px; color: var(--muted); }
+.readline.unread { color: var(--warn); font-weight: 500; }
+.notes { display: grid; gap: 4px; font-size: 13px; }
+.notes .n-item { padding: 6px 8px; background: var(--sunk); border-radius: 6px; overflow-wrap: anywhere; }
+.notes .n-item.new { box-shadow: inset 3px 0 0 var(--warn); }
+.notes .who { font: 500 11.5px/1 var(--font-mono); color: var(--muted); margin-right: 6px; }
 .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-select, input[type="text"], textarea { font: 14px/1.4 var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; min-width: 0; }
+select, input[type="text"], textarea { font: 14px/1.4 var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; min-width: 0; }
 textarea { width: 100%; resize: vertical; min-height: 60px; }
 input[type="text"] { width: 100%; }
-button.btn { font: 500 13px/1 var(--font-body); padding: 7px 11px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+button.btn { font: 500 13px/1 var(--font-body); padding: 9px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
 button.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 button.btn.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
 button.btn.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
 button.btn.q { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
-button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.btn.park { background: var(--later-soft); color: var(--later); border-color: transparent; }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible, .chip:focus-visible, .linkbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .5; cursor: default; }
-.notes { display: grid; gap: 4px; font-size: 13px; }
-.notes .n-item { padding: 6px 8px; background: var(--sunk); border-radius: 6px; overflow-wrap: anywhere; }
-.notes .who { font: 500 11.5px/1 var(--font-mono); color: var(--muted); margin-right: 6px; }
+.more { font: 500 13px/1 var(--font-body); background: none; border: 0; color: var(--accent); cursor: pointer; padding: 8px 4px; justify-self: start; }
+details.card-x summary { cursor: pointer; font-size: 13px; color: var(--accent); list-style: none; padding: 4px 0; }
+details.card-x summary::-webkit-details-marker { display: none; }
+.stack { display: grid; gap: 6px; margin-top: 6px; }
+.undo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--ok-soft); color: var(--ok); border-radius: 6px; padding: 7px 10px; font-size: 13px; }
+/* Grooming plan */
+.plan { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 12px 14px; display: grid; gap: 10px; }
+.plan-sum { cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.plan-sum .gcount { font: 500 13px/1 var(--font-mono); color: var(--muted); }
+.plan-item { display: grid; gap: 4px; padding: 8px 10px; background: var(--sunk); border-radius: 8px; }
+.plan-item .why { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.plan-item.done { opacity: .65; }
 /* Ideas */
-.filters { display: inline-flex; gap: 4px; flex-wrap: wrap; }
-.filters button { font: 500 12.5px/1 var(--font-body); padding: 7px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; font-variant-numeric: tabular-nums; }
-.filters button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.ideas { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 12px; align-items: start; }
-.idea { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
-.idea .top { display: flex; gap: 8px; align-items: start; justify-content: space-between; }
-.idea .pitch { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
-.idea .asks { padding: 8px 10px; border-radius: 6px; background: var(--accent-soft); color: var(--ink); font-size: 13.5px; }
-.idea .asks b { color: var(--accent); }
 .reviews { display: grid; gap: 6px; }
 .rv { display: grid; grid-template-columns: 92px auto 1fr; gap: 8px; align-items: baseline; font-size: 13px; }
 .rv .role { font: 500 12px/1.3 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
@@ -100,40 +134,32 @@ button:disabled { opacity: .5; cursor: default; }
 .how { color: var(--muted); font-size: 14px; max-width: 80ch; }
 .how summary { cursor: pointer; color: var(--ink); font-weight: 500; }
 .how ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
-@media (max-width: 520px) { .rv { grid-template-columns: 1fr auto; } .rv .txt { grid-column: 1 / -1; } }
-@media (prefers-reduced-motion: no-preference) { .card, .idea { transition: border-color .2s; } }
+@media (max-width: 520px) { .strip { gap: 6px; padding-block: 8px; } .strip .line { gap: 2px 12px; font-size: 12.5px; } .lanechips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .lanechips .chip { flex: none; } .status-msg { font-size: 12px; } .rv { grid-template-columns: 1fr auto; } .rv .txt { grid-column: 1 / -1; } details.group > summary .gnote { display: none; } }
+@media (pointer: coarse) { button.btn, .chip, select, .more, .linkbtn, details.card-x summary { min-height: 44px; } details.card-x summary { display: flex; align-items: center; } }
+@media (prefers-reduced-motion: no-preference) { .card { transition: border-color .2s; } }
 </style>
 
 <div class="wrap">
   <header>
     <div class="eyebrow" id="proj-eyebrow">Project board</div>
     <h1 id="proj-name">{{PROJECT}}</h1>
-    <p class="lede" id="proj-lede">What is being built, what is waiting for your check, and the ideas the team is weighing. Claude and the role agents update it as work moves; you approve, reject or question ideas here.</p>
+    <p class="lede" id="proj-lede">What is being built, what is waiting for your check, and the ideas the team is weighing. Claude and the role agents update it as work moves; you approve, park, reject or question ideas here.</p>
   </header>
 
-  <div class="strip" role="status" aria-live="polite">
-    <span class="you" id="s-you">Needs you: <b>0</b></span>
-    <span id="s-doing">In progress: <b>0</b></span>
-    <span id="s-testing">In testing: <b>0</b></span>
-    <span id="s-review">Ideas in review: <b>0</b></span>
-    <span id="s-updated"></span>
-    <span class="status-msg" id="status">Loading the board…</span>
+  <div class="strip">
+    <div class="line">
+      <button class="linkbtn you" id="s-you" type="button">0 need you</button>
+      <span id="s-work"></span>
+      <span id="s-alive"></span>
+      <span id="s-groom"></span>
+    </div>
+    <div class="lanechips" id="lanechips" role="group" aria-label="Jump to a lane"></div>
+    <div class="status-msg" id="status">Loading the board…</div>
   </div>
+  <div class="sr-only" id="live" role="status" aria-live="polite"></div>
+  <div class="sr-only" id="err" role="alert" aria-live="assertive"></div>
 
-  <section aria-labelledby="h-work" style="display:grid;gap:14px">
-    <div class="sec-head">
-      <div style="display:grid;gap:4px"><h2 id="h-work">Work</h2><p>Cards with an amber edge are waiting on you: a check to run, a question to answer.</p></div>
-    </div>
-    <div class="board" id="board"></div>
-  </section>
-
-  <section aria-labelledby="h-ideas" style="display:grid;gap:14px">
-    <div class="sec-head">
-      <div style="display:grid;gap:4px"><h2 id="h-ideas">Ideas</h2><p>Every idea gets a note from each relevant agent: worth doing, doable, or why not. You decide: approve, reject or send back a question.</p></div>
-      <div class="filters" id="filters" role="group" aria-label="Filter ideas"></div>
-    </div>
-    <div class="ideas" id="ideas"></div>
-  </section>
+  <main class="groups" id="groups"></main>
 
   <section class="add" aria-labelledby="h-add">
     <h3 id="h-add">Add an idea or report an issue</h3>
@@ -142,45 +168,47 @@ button:disabled { opacity: .5; cursor: default; }
       <input type="text" id="add-title" placeholder="Short title" aria-label="Title" style="flex:1 1 220px">
     </div>
     <textarea id="add-body" placeholder="What you want, or what went wrong and where" aria-label="Details"></textarea>
-    <div class="row"><button class="btn primary" id="add-go">Add</button><span class="status-msg" id="add-msg" style="flex-basis:auto"></span></div>
+    <div class="row"><button class="btn primary" id="add-go" type="button">Add</button><span class="status-msg" id="add-msg"></span></div>
   </section>
 
   <details class="how">
     <summary>How this board works</summary>
     <ul>
-      <li><b>Work</b> moves Reported → Up next → In progress → In testing → Done. Claude moves cards as agents start, merge and verify work.</li>
-      <li><b>Issues</b> you add land in Reported. Claude triages them into Up next with an owner.</li>
-      <li><b>Ideas</b> you or an agent add start in Reviewing. Each relevant agent adds a verdict (yes / maybe / no), a size (S / M / L) and a reason.</li>
-      <li>You then <b>Approve</b> (it becomes a card in Up next), <b>Reject</b> (kept with your reason), or <b>Ask</b> a question back to the team.</li>
-      <li>Anything you type here is saved for everyone with this page, and Claude reads it at the start of each work session.</li>
+      <li>The page is sorted by <b>who has the ball</b>. <b>Your move</b> is everything only you can do: answers, checks, approvals, and cards to line up. <b>Claude's move</b> is work Claude has or is about to start. <b>Done &amp; parked</b> is out of the way.</li>
+      <li>Each card shows its <b>lane</b> as a chip: Reported → Triaged → Up next → Approved → In progress → In testing → Done. Claude triages what you report; you line cards up (Up next) and clear them to build (Approved); Claude builds and tests.</li>
+      <li>A <b>claim</b> badge on an In-progress card shows when Claude last touched it. While Claude is on a card you can leave comments but not move it. If the badge goes stale you can take the card back.</li>
+      <li>When you answer something, the card says <b>Sent, Claude hasn't read this yet</b> until Claude's next session reads it. You can undo for a few seconds.</li>
+      <li><b>Ideas</b> start in Reviewing. Each relevant agent adds a verdict (yes / maybe / no), a size (S / M / L) and a reason. You then approve, park, reject or ask.</li>
+      <li>The page only changes while a Claude session is running. Anything you type saves immediately and Claude reads it at the start of its next session.</li>
     </ul>
   </details>
 </div>
 
 <script>
 const LANES = [
-  { id: "reported", name: "Reported", color: "var(--bad)" },
-  { id: "next", name: "Up next", color: "var(--later)" },
-  { id: "doing", name: "In progress", color: "var(--accent)" },
-  { id: "testing", name: "In testing", color: "var(--warn)" },
-  { id: "done", name: "Done", color: "var(--ok)" },
-];
-const ISTATES = [
-  { id: "all", name: "All" },
-  { id: "reviewing", name: "Reviewing" },
-  { id: "question", name: "Questions" },
+  { id: "reported", name: "Reported" },
+  { id: "triaged", name: "Triaged" },
+  { id: "next", name: "Up next" },
   { id: "approved", name: "Approved" },
-  { id: "rejected", name: "Rejected" },
+  { id: "doing", name: "In progress" },
+  { id: "testing", name: "In testing" },
+  { id: "done", name: "Done" },
 ];
-const STATE_PILL = { reviewing: ["Reviewing", ""], question: ["Question", "q"], approved: ["Approved", "ok"], rejected: ["Rejected", "bad"] };
-const DONE_SHOWN = 8;
+const LANE_BY = Object.fromEntries(LANES.map(l => [l.id, l]));
+const STATE_PILL = { reviewing: ["Reviewing", ""], question: ["Question", "q"], approved: ["Approved", "ok"], parked: ["Parked", "park"], rejected: ["Rejected", "bad"] };
+const QUIET_MIN = 60, STALE_MIN = 240;   // claim freshness thresholds, minutes since the last Claude touch
+const DONE_SHOWN = 8, UNDO_MS = 8000, ALIVE_OLD_MIN = 120;
 
 let db = null, user = null, canWrite = true;
-let meta = {}, cards = {}, ideas = {};
-let filter = "all", showAllDone = false;
-try { filter = localStorage.getItem("board.filter") || "all"; } catch {}
-const drafts = {}; // text being typed, keyed by input id, survives re-render
-const openX = new Set(); // expanded card panels, survive re-render
+let meta = {}, cards = {}, ideas = {}, plan = null;
+const loaded = { cards: false, ideas: false };
+let showAllDone = false, refocus = null;
+const drafts = {};            // text being typed, keyed by input id, survives re-render
+const openX = new Set();      // expanded card panels, survive re-render
+const openG = new Set(["g-you"]);   // expanded groups
+let groupSeeded = false;
+const undos = {};             // path -> {key, restore, until, label}
+const confirmTake = new Set();// cards awaiting the second tap on "Take back"
 
 const $ = s => document.querySelector(s);
 const el = (tag, attrs = {}, ...kids) => {
@@ -192,19 +220,68 @@ const el = (tag, attrs = {}, ...kids) => {
   for (const k of kids) if (k) e.append(k);
   return e;
 };
-const when = ms => {
-  if (!ms) return "";
-  const d = new Date(ms), now = Date.now(), m = Math.round((now - ms) / 60000);
+const num = v => Number.isFinite(Number(v)) ? Number(v) : 0;
+const ago = ms => {
+  ms = num(ms); if (!ms) return "";
+  const m = Math.max(0, Math.round((Date.now() - ms) / 60000));
   if (m < 1) return "just now"; if (m < 60) return m + " min ago";
   if (m < 60 * 24) return Math.round(m / 60) + " h ago";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (m < 60 * 24 * 14) return Math.round(m / 1440) + " d ago";
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
-const setStatus = t => { $("#status").textContent = t; };
+const setText = (node, t) => { if (node.textContent !== t) node.textContent = t; };
+const setStatus = t => setText($("#status"), t);
+const announce = t => { const n = $("#live"); n.textContent = ""; setTimeout(() => { n.textContent = t; }, 30); };
+const fail = e => { const t = "Couldn't save that: " + (e && e.message || "try again"); setStatus(t); $("#err").textContent = t; };
 const newId = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const noteKey = () => Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+const laneOf = c => LANE_BY[c.lane] ? c.lane : "next";
 
+/* ---------- Writes: one at a time per document ---------- */
+const chain = {};
+function write(path, patch) {
+  const run = (chain[path] || Promise.resolve()).then(() => db.doc(path).update(patch));
+  chain[path] = run.catch(() => {});
+  return run;
+}
+const busy = async (btn, fn) => {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try { await fn(); } catch (e) { fail(e); } finally { btn.disabled = false; }
+};
+
+/* ---------- Notes: a keyed map so two writers never overwrite each other (legacy arrays still read) ---------- */
+function noteEntries(notes) {
+  let list = [];
+  if (Array.isArray(notes)) list = notes.map((n, i) => ({ key: "l" + String(i).padStart(3, "0"), ...(n || {}) }));
+  else if (notes && typeof notes === "object") list = Object.entries(notes).map(([key, n]) => ({ key, ...(n || {}) }));
+  return list.filter(n => n && n.text).sort((a, b) => num(a.at) - num(b.at));
+}
+function notePatch(doc, note, key) {
+  if (Array.isArray(doc.notes)) {   // one-time upgrade of an old board: convert the array to a map
+    const m = {}; doc.notes.forEach((n, i) => { if (n) m["l" + String(i).padStart(3, "0")] = n; });
+    m[key] = note; return { notes: m };
+  }
+  return { notes: { [key]: note } };
+}
+const lastSync = () => num(meta.lastSyncAt != null ? meta.lastSyncAt : meta.updated);
 function noteList(notes) {
-  if (!Array.isArray(notes) || !notes.length) return null;
-  return el("div", { class: "notes" }, ...notes.slice(-6).map(n => el("div", { class: "n-item" }, el("span", { class: "who", text: (n.by || "?") + (n.at ? " · " + when(n.at) : "") }), document.createTextNode(String(n.text || "")))));
+  const all = noteEntries(notes); if (!all.length) return null;
+  const sync = lastSync();
+  const unread = n => n.by === "you" && num(n.at) > sync;
+  const keep = new Set([...all.filter(unread).map(n => n.key), ...all.slice(-3).map(n => n.key)]);
+  const shown = all.filter(n => keep.has(n.key));
+  return el("div", { class: "notes" }, ...shown.map(n => el("div", { class: "n-item" + (unread(n) ? " new" : "") },
+    el("span", { class: "who", text: (n.by || "?") + (n.at ? " · " + ago(n.at) : "") }), document.createTextNode(String(n.text || "")))));
+}
+function readLine(notes) {
+  const mine = noteEntries(notes).filter(n => n.by === "you");
+  if (!mine.length) return null;
+  const last = mine[mine.length - 1];
+  if (Date.now() - num(last.at) > 7 * 86400000) return null;
+  return num(last.at) > lastSync()
+    ? el("p", { class: "readline unread", text: "Sent " + ago(last.at) + " · Claude hasn't read this yet" })
+    : el("p", { class: "readline", text: "Claude has read your latest note" });
 }
 function draftArea(id, placeholder) {
   const t = el("textarea", { id, placeholder, "aria-label": placeholder });
@@ -213,162 +290,426 @@ function draftArea(id, placeholder) {
   return t;
 }
 
-/* ---------- Work board ---------- */
-function renderBoard() {
-  const board = $("#board"); board.replaceChildren();
-  const list = Object.entries(cards).map(([id, c]) => ({ id, ...c }));
-  for (const lane of LANES) {
-    let items = list.filter(c => (c.lane || "next") === lane.id).sort((a, b) => (b.needsYou ? 1 : 0) - (a.needsYou ? 1 : 0) || (a.order ?? 999) - (b.order ?? 999) || (b.updated || 0) - (a.updated || 0));
-    const total = items.length;
-    if (lane.id === "done") { items.sort((a, b) => (b.updated || 0) - (a.updated || 0)); if (!showAllDone) items = items.slice(0, DONE_SHOWN); }
-    const col = el("div", { class: "lane", role: "region", "aria-label": lane.name },
-      el("div", { class: "lane-head" }, el("span", { class: "swatch", style: "background:" + lane.color }), el("h3", { text: lane.name }), el("span", { class: "n", text: String(total) })));
-    if (!items.length) col.append(el("div", { class: "empty", text: lane.id === "reported" ? "Nothing reported. Add an issue below." : "Nothing here." }));
-    for (const c of items) col.append(cardEl(c));
-    if (lane.id === "done" && total > DONE_SHOWN) col.append(el("button", { class: "more", text: showAllDone ? "Show recent only" : `Show all ${total}`, onclick: () => { showAllDone = !showAllDone; renderBoard(); } }));
-    board.append(col);
-  }
+/* ---------- Who has the ball ---------- */
+function claimInfo(c) {
+  const k = c.claim; if (!k || typeof k !== "object") return null;
+  const t = num(k.heartbeatAt) || num(k.startedAt) || num(k.at);
+  const min = t ? (Date.now() - t) / 60000 : Infinity;
+  return { by: k.by || "Claude", t, state: min < QUIET_MIN ? "live" : min < STALE_MIN ? "quiet" : "stale" };
 }
+const locked = c => { const ci = claimInfo(c); return !!ci && ci.state !== "stale"; };
+function cardBall(c) {
+  const ln = laneOf(c);
+  if (c.archived || ln === "done") return "done";
+  if (c.needsYou) return "you";
+  const ci = claimInfo(c);
+  if (ci && ci.state === "stale" && ln === "doing") return "you";
+  if (ln === "triaged" || ln === "next") return "you";
+  return "claude";
+}
+function ideaBall(i) {
+  const st = i.status || "reviewing";
+  if (i.archived) return "done";
+  if (st === "question") return i.askBy === "you" ? "claude" : "you";
+  if (st === "reviewing") return Object.keys(i.reviews || {}).length ? "you" : "claude";
+  return "done";
+}
+const sinceOf = c => num(c.needsYouAt) || num(c.updated) || num(c.created);
+
+/* ---------- Card building blocks ---------- */
+function claimBadge(c) {
+  const ln = laneOf(c), ci = claimInfo(c);
+  if (!ci) return ln === "doing" ? el("span", { class: "pill none", text: "○ Unclaimed" }) : null;
+  const t = ci.t ? ago(ci.t) : "";
+  if (ci.state === "live") return el("span", { class: "pill live", text: "● Working · " + t });
+  if (ci.state === "quiet") return el("span", { class: "pill quiet", text: "◐ Quiet · last touched " + t });
+  return el("span", { class: "pill stale", text: "○ Stale · last touched " + t });
+}
+function undoBar(path) {
+  const u = undos[path]; if (!u || u.until < Date.now()) return null;
+  const b = el("button", { class: "btn", type: "button", text: "Undo" });
+  b.addEventListener("click", () => busy(b, async () => {
+    await write(path, { ...u.restore, updated: Date.now(), notes: { [u.key]: null } });
+    delete undos[path]; announce("Undone."); render();
+  }));
+  return el("div", { class: "undo" }, el("span", { text: "Sent. Claude will see it next session." }), b);
+}
+function armUndo(path, key, restore) {
+  undos[path] = { key, restore, until: Date.now() + UNDO_MS };
+  setTimeout(() => { if (undos[path] && undos[path].until <= Date.now()) { delete undos[path]; scheduleRender(); } }, UNDO_MS + 100);
+  announce("Sent. You can undo for 8 seconds.");
+}
+async function sendAnswer(path, doc, label, text, extra, box) {
+  const t = ((label ? "[" + label + "] " : "") + (text || "")).trim();
+  const key = noteKey(), now = Date.now();
+  const restore = {}; for (const k of Object.keys(extra)) restore[k] = doc[k] === undefined ? "" : doc[k];
+  const nxt = box && box.nextElementSibling; refocus = nxt && nxt.id || null;
+  await write(path, { updated: now, ...extra, ...notePatch(doc, { by: "you", at: now, text: t, kind: "answer" }, key) });
+  delete drafts[path]; armUndo(path, key, restore);
+}
+function answerControls(c) {
+  const path = "cards/" + c.id, kind = c.needsYouKind || "check";
+  const ta = draftArea("ans-" + c.id, kind === "question" ? "Your answer" : "Add a detail (optional)");
+  const row = el("div", { class: "row" });
+  const act = (btn, label, mustText) => btn.addEventListener("click", () => busy(btn, async () => {
+    const text = (drafts["ans-" + c.id] || "").trim();
+    if (mustText && !text) { setStatus("Type your answer first."); ta.focus(); return; }
+    await sendAnswer(path, c, label, text, { needsYou: false }, btn.closest(".card"));
+  }));
+  const mk = (cls, label, send, must) => { const b = el("button", { class: "btn " + cls, type: "button", text: label }); act(b, send, must); row.append(b); };
+  if (kind === "question") mk("primary", "Send answer", "", true);
+  else if (kind === "decision") { mk("ok", "Approve", "Approved"); mk("bad", "Not yet", "Not yet"); }
+  else { mk("ok", "Works", "Works"); mk("bad", "Broken", "Broken"); }
+  return el("div", { class: "stack" }, ta, row);
+}
+function laneButtons(c) {
+  const ln = laneOf(c), row = el("div", { class: "row" });
+  const go = (label, lane, cls) => {
+    const b = el("button", { class: "btn " + cls, type: "button", text: label });
+    b.addEventListener("click", () => busy(b, async () => {
+      const nxt = b.closest(".card"); const s = nxt && nxt.nextElementSibling; refocus = s && s.id || null;
+      await moveLane(c, lane);
+    }));
+    row.append(b);
+  };
+  if (ln === "triaged") go("Line up: Up next", "next", "primary");
+  if (ln === "next") { go("Approve to build", "approved", "ok"); go("Back to Triaged", "triaged", ""); }
+  return row.childNodes.length ? row : null;
+}
+async function moveLane(c, lane) {
+  const path = "cards/" + c.id;
+  const snap = await db.doc(path).get(); const cur = (snap.exists && snap.data()) || c;   // check at write time, not just render time
+  if (locked(cur) && lane !== cur.lane) { setStatus("Claude claimed this card while you were looking. Leave a comment instead."); return; }
+  await write(path, { lane, needsYou: false, updated: Date.now(), movedBy: "you", movedAt: Date.now() });
+}
+function moreControls(c) {
+  const path = "cards/" + c.id, ln = laneOf(c), lock = locked(c);
+  const x = el("details", { class: "card-x", open: openX.has(c.id) ? "" : null }, el("summary", { text: "Move or add a note — " + (c.title || "card") }));
+  x.addEventListener("toggle", () => { x.open ? openX.add(c.id) : openX.delete(c.id); });
+  const body = el("div", { class: "stack" });
+  let sel = null;
+  if (lock) body.append(el("p", { class: "lock", text: "Claude is on this card, so you can comment but not move it. If it goes stale you can take it back." }));
+  else { sel = el("select", { "aria-label": "Move " + (c.title || "card") + " to lane" }, ...LANES.map(l => el("option", { value: l.id, text: l.name, selected: ln === l.id ? "" : null }))); body.append(sel); }
+  const ta = draftArea("cn-" + c.id, "Note for the team (e.g. tested, works)");
+  const go = el("button", { class: "btn", type: "button", text: "Save" });
+  go.addEventListener("click", () => busy(go, async () => {
+    const text = (drafts["cn-" + c.id] || "").trim(), now = Date.now();
+    const lane = sel && sel.value !== ln ? sel.value : null;
+    if (!text && !lane) return;
+    if (lane) { const snap = await db.doc(path).get(); const cur = (snap.exists && snap.data()) || c; if (locked(cur)) { setStatus("Claude claimed this card while you were looking. Leave a comment instead."); return; } }
+    const key = noteKey();
+    const patch = { updated: now };
+    if (lane) { patch.lane = lane; patch.needsYou = false; patch.movedBy = "you"; patch.movedAt = now; }
+    if (text) Object.assign(patch, notePatch(c, { by: "you", at: now, text, kind: "comment" }, key));
+    await write(path, patch); delete drafts["cn-" + c.id];
+    setStatus("Saved. Claude will see it next session."); announce("Saved.");
+  }));
+  const archive = el("button", { class: "btn", type: "button", text: c.archived ? "Restore" : "Archive" });
+  archive.addEventListener("click", () => busy(archive, async () => {
+    await write(path, c.archived ? { archived: false, archiveReason: "", updated: Date.now() } : { archived: true, archivedAt: Date.now(), archiveReason: "archived by you", updated: Date.now() });
+  }));
+  const row = el("div", { class: "row" }, go);
+  if (ln === "done" || c.archived) row.append(archive);
+  body.append(ta, row);
+  x.append(body); return x;
+}
+function takeBack(c) {
+  const path = "cards/" + c.id, armed = confirmTake.has(c.id);
+  const b = el("button", { class: "btn " + (armed ? "bad" : ""), type: "button", text: armed ? "Yes, take it back" : "Take it back" });
+  b.addEventListener("click", () => {
+    if (!armed) { confirmTake.add(c.id); render(); return; }
+    busy(b, async () => {
+      const now = Date.now(), key = noteKey();
+      await write(path, { claim: null, lane: "approved", updated: now, movedBy: "you", movedAt: now, ...notePatch(c, { by: "you", at: now, text: "Took this back: the claim went stale, so it is queued again as Approved.", kind: "comment" }, key) });
+      confirmTake.delete(c.id);
+    });
+  });
+  return b;
+}
+
+/* ---------- Work card ---------- */
 function cardEl(c) {
-  const meta = el("div", { class: "meta" });
-  if (c.ref) meta.append(el("span", { text: c.ref }));
-  if (c.owner) meta.append(el("span", { text: c.owner }));
-  if (c.updated) meta.append(el("span", { text: when(c.updated) }));
-  const box = el("article", { class: "card" + (c.needsYou ? " needs" : "") },
-    el("h3", { text: c.title || "(untitled)" }), meta);
-  if (c.needsYou) box.append(el("div", { class: "row" }, el("span", { class: "pill you", text: c.needsYou === true ? "Needs you" : String(c.needsYou) })));
+  const ln = laneOf(c), L = LANE_BY[ln], ball = cardBall(c);
+  const meta2 = el("div", { class: "meta" });
+  if (c.ref) meta2.append(el("span", { text: c.ref }));
+  if (c.owner) meta2.append(el("span", { text: c.owner }));
+  if (c.updated) meta2.append(el("span", { text: ago(c.updated) }));
+  const tags = el("div", { class: "tags" }, el("span", { class: "pill lane", "data-lane": ln, text: L.name }));
+  const cb = claimBadge(c); if (cb) tags.append(cb);
+  if (c.archived) tags.append(el("span", { class: "pill park", text: "Archived" }));
+  const box = el("article", { class: "card" + (c.needsYou && ln !== "done" ? " needs" : ""), id: "card-" + c.id, tabindex: "-1", "data-lane": ln },
+    tags, el("h3", { text: c.title || "(untitled)" }), meta2);
+  if (c.needsYou && ln !== "done") {
+    const na = el("div", { class: "needs-ask" }, el("span", { class: "lbl", text: "Needs you" + (c.needsYouAt ? " · " + ago(c.needsYouAt) : "") }));
+    if (c.needsYou !== true) na.append(el("p", { class: "ask", text: String(c.needsYou) }));
+    box.append(na);
+  }
   if (c.detail) box.append(el("p", { class: "detail", text: c.detail }));
   const nl = noteList(c.notes); if (nl) box.append(nl);
+  const rl = readLine(c.notes); if (rl) box.append(rl);
+  const ub = undoBar("cards/" + c.id); if (ub) box.append(ub);
   if (canWrite && db) {
-    const x = el("details", { class: "card-x", open: openX.has(c.id) ? "" : null }, el("summary", { text: "Move or add a note" }));
-    x.addEventListener("toggle", () => { x.open ? openX.add(c.id) : openX.delete(c.id); });
-    const sel = el("select", { "aria-label": "Lane" }, ...LANES.map(l => el("option", { value: l.id, text: l.name, selected: (c.lane || "next") === l.id ? "" : null })));
-    const ta = draftArea("cn-" + c.id, "Note for the team (e.g. tested, works)");
-    const go = el("button", { class: "btn", text: "Save" });
-    go.addEventListener("click", async () => {
-      const text = (drafts["cn-" + c.id] || "").trim();
-      const patch = { updated: Date.now() };
-      if (sel.value !== (c.lane || "next")) patch.lane = sel.value;
-      if (text) patch.notes = [...(Array.isArray(c.notes) ? c.notes : []), { by: "you", at: Date.now(), text }];
-      if (Object.keys(patch).length === 1) return;
-      if (patch.lane === "done" && c.needsYou) patch.needsYou = false;
-      go.disabled = true;
-      try { await db.doc("cards/" + c.id).update(patch); delete drafts["cn-" + c.id]; }
-      catch (e) { setStatus("Couldn't save that change: " + (e && e.message || "try again")); go.disabled = false; }
-    });
-    x.append(el("div", { style: "display:grid;gap:6px;margin-top:6px" }, sel, ta, el("div", { class: "row" }, go)));
-    box.append(x);
+    if (c.needsYou && ln !== "done") box.append(answerControls(c));
+    const ci = claimInfo(c);
+    if (ci && ci.state === "stale" && ln === "doing") {
+      box.append(el("p", { class: "lock", text: "Claude hasn't touched this since " + ago(ci.t) + ". Its session may have ended." }), el("div", { class: "row" }, takeBack(c)));
+    } else {
+      const lb = !c.needsYou && laneButtons(c); if (lb && !locked(c)) box.append(lb);
+    }
+    box.append(moreControls(c));
   }
   return box;
 }
 
-/* ---------- Ideas ---------- */
-function renderFilters() {
-  const f = $("#filters"); f.replaceChildren();
-  const list = Object.values(ideas);
-  for (const s of ISTATES) {
-    const n = s.id === "all" ? list.length : list.filter(i => (i.status || "reviewing") === s.id).length;
-    f.append(el("button", { "aria-pressed": String(filter === s.id), text: `${s.name} ${n}`, onclick: () => { filter = s.id; try { localStorage.setItem("board.filter", filter); } catch {} renderIdeas(); renderFilters(); } }));
-  }
-}
-const ORDER = { question: 0, reviewing: 1, approved: 2, rejected: 3 };
-function renderIdeas() {
-  const box = $("#ideas"); box.replaceChildren();
-  let list = Object.entries(ideas).map(([id, i]) => ({ id, ...i }));
-  if (filter !== "all") list = list.filter(i => (i.status || "reviewing") === filter);
-  list.sort((a, b) => (ORDER[a.status || "reviewing"] - ORDER[b.status || "reviewing"]) || (b.updated || 0) - (a.updated || 0));
-  if (!list.length) box.append(el("p", { class: "empty", text: Object.keys(ideas).length ? "No ideas in this view." : "No ideas yet. Add one below; the agents will review it." }));
-  for (const i of list) box.append(ideaEl(i));
-}
+/* ---------- Idea card ---------- */
 function ideaEl(i) {
-  const st = i.status || "reviewing";
+  const st = i.status || "reviewing", ball = ideaBall(i);
   const [label, cls] = STATE_PILL[st] || STATE_PILL.reviewing;
   const reviews = i.reviews && typeof i.reviews === "object" ? Object.entries(i.reviews) : [];
-  const yes = reviews.filter(([, r]) => r && r.verdict === "yes").length, maybe = reviews.filter(([, r]) => r && r.verdict === "maybe").length, no = reviews.filter(([, r]) => r && r.verdict === "no").length;
-  const card = el("article", { class: "idea" },
-    el("div", { class: "top" }, el("h3", { text: i.title || "(untitled)" }), el("span", { class: "pill " + cls, text: label })),
-    el("div", { class: "meta", style: "font:12px/1.3 var(--font-mono);color:var(--muted);display:flex;gap:8px;flex-wrap:wrap" },
-      el("span", { text: "from " + (i.from || "?") }), i.ref ? el("span", { text: i.ref }) : null, i.updated ? el("span", { text: when(i.updated) }) : null));
+  const cnt = v => reviews.filter(([, r]) => r && r.verdict === v).length;
+  const card = el("article", { class: "card" + (ball === "you" && st === "question" ? " needs" : ""), id: "idea-" + i.id, tabindex: "-1" },
+    el("div", { class: "tags" }, el("span", { class: "pill lane", text: "Idea" }), el("span", { class: "pill " + cls, text: label })),
+    el("h3", { text: i.title || "(untitled)" }),
+    el("div", { class: "meta" }, el("span", { text: "from " + (i.from || "?") }), i.ref ? el("span", { text: i.ref }) : null, i.updated ? el("span", { text: ago(i.updated) }) : null));
   if (i.pitch) card.append(el("p", { class: "pitch", text: i.pitch }));
   if (i.ask) card.append(el("div", { class: "asks" }, el("b", { text: st === "question" && i.askBy === "you" ? "Your question: " : "Question for you: " }), document.createTextNode(i.ask)));
   if (reviews.length) {
-    card.append(el("div", { class: "tally-mini" }, el("span", { text: `${yes} yes` }), el("span", { text: `${maybe} maybe` }), el("span", { text: `${no} no` })));
+    card.append(el("div", { class: "tally-mini" }, el("span", { text: cnt("yes") + " yes" }), el("span", { text: cnt("maybe") + " maybe" }), el("span", { text: cnt("no") + " no" })));
     const rv = el("div", { class: "reviews" });
     for (const [role, r] of reviews) {
       if (!r) continue;
       rv.append(el("div", { class: "rv" }, el("span", { class: "role", text: role }),
-        el("span", { class: "verdict " + (r.verdict || "maybe"), text: (r.verdict || "maybe") + (r.size ? " · " + r.size : "") }),
+        el("span", { class: "verdict " + (["yes", "maybe", "no"].includes(r.verdict) ? r.verdict : "maybe"), text: (r.verdict || "maybe") + (r.size ? " · " + r.size : "") }),
         el("span", { class: "txt", text: r.note || "" })));
     }
     card.append(rv);
-  } else card.append(el("p", { class: "empty", style: "padding:0", text: "Waiting for agent reviews." }));
-  if (i.decision) card.append(el("p", { class: "pitch", text: "Decision: " + i.decision }));
+  } else if (st === "reviewing") card.append(el("p", { class: "empty", style: "padding:0", text: "Waiting for agent reviews." }));
+  if (i.decision && (st === "approved" || st === "parked" || st === "rejected")) card.append(el("p", { class: "pitch", text: "Decision: " + i.decision }));
   const nl = noteList(i.notes); if (nl) card.append(nl);
+  const rl = readLine(i.notes); if (rl) card.append(rl);
+  const ub = undoBar("ideas/" + i.id); if (ub) card.append(ub);
   if (canWrite && db) {
+    const path = "ideas/" + i.id;
     const ta = draftArea("in-" + i.id, "Your reason, question or note");
-    const act = async (status) => {
-      const text = (drafts["in-" + i.id] || "").trim();
-      if (status === "question" && !text) { setStatus("Type the question first, then press Ask."); ta.focus(); return; }
-      const patch = { updated: Date.now() };
-      if (status) { patch.status = status; if (status === "question") { patch.ask = text; patch.askBy = "you"; } else if (text) patch.decision = text; }
-      if (text) patch.notes = [...(Array.isArray(i.notes) ? i.notes : []), { by: "you", at: Date.now(), text: (status ? `[${STATE_PILL[status][0]}] ` : "") + text }];
+    const act = (btn, status, opts = {}) => btn.addEventListener("click", () => busy(btn, async () => {
+      const text = (drafts["in-" + i.id] || "").trim(), now = Date.now();
+      if ((status === "question" || opts.answer) && !text) { setStatus(opts.answer ? "Type your answer first." : "Type the question first, then press Ask."); ta.focus(); return; }
+      if ((status === "parked" || status === "rejected") && !text) { setStatus("Add a short reason first, so the decision is kept with it."); ta.focus(); return; }
+      const patch = { updated: now };
+      if (opts.answer) { patch.status = "reviewing"; patch.ask = ""; patch.askBy = ""; patch.answeredAsk = i.ask || ""; }
+      else if (status) {
+        patch.status = status;
+        patch.ask = status === "question" ? text : ""; patch.askBy = status === "question" ? "you" : "";
+        patch.decision = (status === "approved" || status === "parked" || status === "rejected") ? text : "";
+      }
+      if (text) Object.assign(patch, notePatch(i, { by: "you", at: now, text: (opts.answer ? "[Answer] " : status ? "[" + STATE_PILL[status][0] + "] " : "") + text, kind: opts.answer ? "answer" : "comment" }, noteKey()));
       if (Object.keys(patch).length === 1) return;
-      try { await db.doc("ideas/" + i.id).update(patch); delete drafts["in-" + i.id]; }
-      catch (e) { setStatus("Couldn't save that: " + (e && e.message || "try again")); }
-    };
+      const nxt = btn.closest(".card"); const s = nxt && nxt.nextElementSibling; refocus = s && s.id || null;
+      await write(path, patch); delete drafts["in-" + i.id];
+      setStatus("Saved. Claude will see it next session."); announce("Saved.");
+    }));
     const row = el("div", { class: "row" });
-    if (st !== "approved") row.append(el("button", { class: "btn ok", text: "Approve", onclick: () => act("approved") }));
-    if (st !== "rejected") row.append(el("button", { class: "btn bad", text: "Reject", onclick: () => act("rejected") }));
-    row.append(el("button", { class: "btn q", text: "Ask", onclick: () => act("question") }));
-    if (st !== "reviewing") row.append(el("button", { class: "btn", text: "Back to review", onclick: () => act("reviewing") }));
-    row.append(el("button", { class: "btn", text: "Add note", onclick: () => act(null) }));
+    const add = (cls, text, status, opts) => { const b = el("button", { class: "btn " + cls, type: "button", text }); act(b, status, opts); row.append(b); };
+    if (st === "question" && i.askBy !== "you") add("primary", "Send answer", null, { answer: true });
+    if (st !== "approved") add("ok", "Approve", "approved");
+    if (st !== "parked") add("park", "Park", "parked");
+    if (st !== "rejected") add("bad", "Reject", "rejected");
+    add("q", "Ask", "question");
+    if (st !== "reviewing") add("", "Back to review", "reviewing");
+    add("", "Add note", null);
     card.append(ta, row);
   }
   return card;
 }
 
+/* ---------- Grooming plan (written by /huddle groom; you tick what to apply) ---------- */
+function planPanel() {
+  if (!plan || plan.status !== "proposed") return null;
+  const items = Object.entries(plan.items || {}).map(([id, it]) => ({ id, ...it }));
+  if (!items.length) return null;
+  const decide = (id, decision) => write("meta/groomPlan", { items: { [id]: { decision } } });
+  const left = items.filter(it => !it.decision).length;
+  const box = el("details", { class: "plan", id: "g-plan", open: openG.has("g-plan") ? "" : null },
+    el("summary", { class: "plan-sum" }, el("strong", { text: "Claude proposes tidying the board" }), el("span", { class: "gcount", text: items.length + " change" + (items.length === 1 ? "" : "s") + (left ? ", " + left + " to review" : ", all reviewed") })));
+  box.addEventListener("toggle", () => { box.open ? openG.add("g-plan") : openG.delete("g-plan"); });
+  box.append(el("p", { class: "detail", text: "Nothing is deleted. Approve what looks right; Claude applies only the approved ones next time you run /huddle groom apply." }));
+  for (const it of items) {
+    const d = it.decision || "";
+    const row = el("div", { class: "row" });
+    const a = el("button", { class: "btn ok", type: "button", text: d === "approved" ? "✓ Approved" : "Approve", "aria-pressed": String(d === "approved") });
+    const s = el("button", { class: "btn", type: "button", text: d === "skipped" ? "✓ Skipped" : "Skip", "aria-pressed": String(d === "skipped") });
+    a.addEventListener("click", () => busy(a, () => decide(it.id, "approved")));
+    s.addEventListener("click", () => busy(s, () => decide(it.id, "skipped")));
+    row.append(a, s);
+    box.append(el("div", { class: "plan-item" + (d ? " done" : "") },
+      el("div", { class: "tags" }, el("span", { class: "pill lane", text: it.kind || "change" }), el("strong", { text: it.title || "(untitled)" })),
+      it.why ? el("p", { class: "why", text: it.why }) : null, row));
+  }
+  const rest = items.filter(it => !it.decision);
+  if (rest.length > 1) {
+    const all = el("button", { class: "btn primary", type: "button", text: "Approve all " + rest.length + " remaining" });
+    all.addEventListener("click", () => busy(all, () => write("meta/groomPlan", { items: Object.fromEntries(rest.map(it => [it.id, { decision: "approved" }])) })));
+    box.append(el("div", { class: "row" }, all));
+  }
+  return box;
+}
+
+/* ---------- Groups ---------- */
+const ready = () => loaded.cards && loaded.ideas;
+function group(id, title, count, note, kids, cls) {
+  const d = el("details", { class: "group " + (cls || ""), id }, el("summary", {}, el("h2", { text: title }), el("span", { class: "gcount", text: String(count) }), note ? el("span", { class: "gnote", text: note }) : null));
+  if (openG.has(id)) d.open = true;
+  d.addEventListener("toggle", () => { d.open ? openG.add(id) : openG.delete(id); });
+  for (const k of kids) if (k) d.append(k);
+  return d;
+}
+function sub(title, nodes) {
+  if (!nodes.length) return null;
+  return el("div", { class: "sub" }, el("h4", { text: title + " · " + nodes.length }), el("div", { class: "cards" }, ...nodes));
+}
+function renderGroups() {
+  const root = $("#groups"); root.replaceChildren();
+  if (!ready()) { root.append(el("p", { class: "empty", text: "Loading the board…" })); return; }
+  const cl = Object.entries(cards).map(([id, c]) => ({ id, ...c }));
+  const il = Object.entries(ideas).map(([id, i]) => ({ id, ...i }));
+  const old = (a, b) => sinceOf(a) - sinceOf(b);
+
+  const needs = cl.filter(c => cardBall(c) === "you" && c.needsYou).sort(old);
+  const stale = cl.filter(c => cardBall(c) === "you" && !c.needsYou && laneOf(c) === "doing").sort(old);
+  const lineup = cl.filter(c => cardBall(c) === "you" && !c.needsYou && laneOf(c) !== "doing").sort((a, b) => LANES.findIndex(l => l.id === laneOf(b)) - LANES.findIndex(l => l.id === laneOf(a)) || old(a, b));
+  const askIdeas = il.filter(i => ideaBall(i) === "you" && (i.status || "reviewing") === "question").sort((a, b) => num(a.updated) - num(b.updated));
+  const reviewed = il.filter(i => ideaBall(i) === "you" && (i.status || "reviewing") === "reviewing").sort((a, b) => num(a.updated) - num(b.updated));
+  const youCount = needs.length + stale.length + lineup.length + askIdeas.length + reviewed.length;
+
+  const mine = cl.filter(c => cardBall(c) === "claude");
+  const order = { stale: 0, doing: 1, testing: 2, approved: 3, reported: 4 };
+  mine.sort((a, b) => (order[laneOf(a)] ?? 9) - (order[laneOf(b)] ?? 9) || num(b.updated) - num(a.updated));
+  const waitingIdeas = il.filter(i => ideaBall(i) === "claude");
+  const claudeCount = mine.length + waitingIdeas.length;
+
+  if (!groupSeeded) { groupSeeded = true; if (claudeCount && claudeCount <= 8) openG.add("g-claude"); }
+
+  const you = [];
+  const p = planPanel();
+  you.push(sub("Decide & answer", [...needs.map(cardEl), ...askIdeas.map(ideaEl)]));
+  if (p) you.push(p);
+  you.push(sub("Check on stale work", stale.map(cardEl)));
+  you.push(sub("Ready for your call", reviewed.map(ideaEl)));
+  you.push(sub("Line up for Claude", lineup.map(cardEl)));
+  const nothing = !p && youCount === 0;
+  if (nothing) you.push(el("p", { class: "empty", text: "Nothing needs you right now." + (claudeCount ? " Claude has " + claudeCount + " in flight." : "") }));
+  root.append(group("g-you", "Your move", youCount + (p ? 1 : 0), youCount ? "oldest first" : "", you, "you"));
+
+  const cm = [];
+  cm.push(sub("Claude's work", mine.map(cardEl)));
+  cm.push(sub("Ideas with the reviewers", waitingIdeas.map(ideaEl)));
+  if (!claudeCount) cm.push(el("p", { class: "empty", text: "Claude is idle. Line something up and approve it to start." }));
+  root.append(group("g-claude", "Claude's move", claudeCount, claudeCount ? "stale ones show under Your move" : "", cm));
+
+  const done = cl.filter(c => cardBall(c) === "done" && !c.archived).sort((a, b) => num(b.updated) - num(a.updated));
+  const shown = showAllDone ? done : done.slice(0, DONE_SHOWN);
+  const parked = il.filter(i => ideaBall(i) === "done" && !i.archived).sort((a, b) => num(b.updated) - num(a.updated));
+  const arch = [...cl.filter(c => c.archived), ...il.filter(i => i.archived)].sort((a, b) => num(b.archivedAt) - num(a.archivedAt));
+  const dp = [];
+  dp.push(sub("Finished", shown.map(cardEl)));
+  if (done.length > DONE_SHOWN) dp.push(el("button", { class: "more", type: "button", text: showAllDone ? "Show recent only" : "Show all " + done.length, onclick: () => { showAllDone = !showAllDone; render(); } }));
+  dp.push(sub("Decided ideas", parked.map(ideaEl)));
+  if (arch.length) {
+    const ad = el("details", { class: "card-x", id: "g-arch", open: openG.has("g-arch") ? "" : null }, el("summary", { text: "Archived (" + arch.length + ")" }));
+    ad.addEventListener("toggle", () => { ad.open ? openG.add("g-arch") : openG.delete("g-arch"); });
+    ad.append(el("div", { class: "cards", style: "margin-top:8px" }, ...arch.map(x => x.pitch !== undefined || x.status ? ideaEl(x) : cardEl(x))));
+    dp.push(ad);
+  }
+  if (!done.length && !parked.length && !arch.length) dp.push(el("p", { class: "empty", text: "Nothing finished yet." }));
+  root.append(group("g-done", "Done & parked", done.length + parked.length + arch.length, "", dp));
+}
+
+/* ---------- Strip ---------- */
+function renderStrip() {
+  const cl = Object.values(cards), il = Object.values(ideas);
+  const you = cl.filter(c => cardBall(c) === "you").length + il.filter(i => ideaBall(i) === "you").length + (plan && plan.status === "proposed" ? 1 : 0);
+  const working = cl.filter(c => { const ci = claimInfo(c); return ci && ci.state !== "stale" && laneOf(c) === "doing"; }).length;
+  const staleN = cl.filter(c => { const ci = claimInfo(c); return ci && ci.state === "stale" && laneOf(c) === "doing"; }).length;
+  setText($("#s-you"), ready() ? you + " need" + (you === 1 ? "s" : "") + " you" : "Loading…");
+  setText($("#s-work"), "Claude: " + working + " working" + (staleN ? " · " + staleN + " stale" : ""));
+  const alive = $("#s-alive"), t = num(meta.updated);
+  alive.className = t && (Date.now() - t) / 60000 > ALIVE_OLD_MIN ? "warnt" : "";
+  setText(alive, !t ? "" : alive.className ? "Claude last wrote " + ago(t) + ". No session is running, so this is its last known state." : "Claude last wrote " + ago(t));
+  const g = meta.lastGroom && num(meta.lastGroom.at), gs = $("#s-groom");
+  gs.className = !g || (Date.now() - g) / 86400000 > 7 ? "warnt" : "";
+  setText(gs, !ready() ? "" : g ? (gs.className ? "Needs grooming · last " : "Groomed ") + ago(g) : "Not groomed yet");
+  const chips = $("#lanechips"), sig = LANES.map(l => l.id + Object.values(cards).filter(c => !c.archived && laneOf(c) === l.id).length).join();
+  if (chips.dataset.sig !== sig) {
+    chips.dataset.sig = sig; chips.replaceChildren();
+    for (const l of LANES) {
+      const n = Object.values(cards).filter(c => !c.archived && laneOf(c) === l.id).length;
+      chips.append(el("button", { class: "chip", type: "button", "aria-label": "Jump to " + l.name + ", " + n + " cards", onclick: () => jumpLane(l.id) }, document.createTextNode(l.name + " "), el("b", { text: String(n) })));
+    }
+  }
+  if (meta.name) { setText($("#proj-name"), meta.name); document.title = meta.name + " Board"; }
+  if (meta.lede) setText($("#proj-lede"), meta.lede);
+}
+function flash(t) {
+  t.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+  t.focus({ preventScroll: true }); t.classList.add("flash"); setTimeout(() => t.classList.remove("flash"), 1800);
+}
+function jumpLane(id) {
+  const t = document.querySelector('.card[data-lane="' + id + '"]');
+  if (!t) { setStatus("No cards in " + LANE_BY[id].name + "."); return; }
+  for (let p = t.parentElement; p; p = p.parentElement) if (p.tagName === "DETAILS") p.open = true;
+  flash(t);
+}
+$("#s-you").addEventListener("click", () => { const g = $("#g-you"); if (!g) return; g.open = true; const first = g.querySelector(".card"); (first || g).scrollIntoView({ block: "start" }); if (first) first.focus({ preventScroll: true }); });
+
 /* ---------- Add ---------- */
-$("#add-go").addEventListener("click", async () => {
-  const kind = $("#add-kind").value, title = $("#add-title").value.trim(), body = $("#add-body").value.trim();
-  if (!title) { $("#add-msg").textContent = "Give it a short title."; $("#add-title").focus(); return; }
-  if (!db || !canWrite) { $("#add-msg").textContent = "Saving isn't available in this view."; return; }
-  const now = Date.now();
-  try {
+$("#add-go").addEventListener("click", function () {
+  busy(this, async () => {
+    const kind = $("#add-kind").value, title = $("#add-title").value.trim(), body = $("#add-body").value.trim();
+    if (!title) { $("#add-msg").textContent = "Give it a short title."; $("#add-title").focus(); return; }
+    if (!db || !canWrite) { $("#add-msg").textContent = "Saving isn't available in this view."; return; }
+    const now = Date.now();
     if (kind === "issue") await db.doc("cards/" + newId("c")).set({ title, detail: body, lane: "reported", owner: "", from: "you", updated: now, created: now });
     else await db.doc("ideas/" + newId("i")).set({ title, pitch: body, from: "you", status: "reviewing", reviews: {}, updated: now, created: now });
     $("#add-title").value = ""; $("#add-body").value = "";
-    $("#add-msg").textContent = kind === "issue" ? "Added to Reported." : "Added. The agents will review it.";
-  } catch (e) { $("#add-msg").textContent = "Couldn't add it: " + (e && e.message || "try again"); }
+    $("#add-msg").textContent = kind === "issue" ? "Added to Reported. Claude triages it next session." : "Added. The agents will review it.";
+  });
 });
 
-function renderStrip() {
-  const cl = Object.values(cards), il = Object.values(ideas);
-  const you = cl.filter(c => c.needsYou && c.lane !== "done").length + il.filter(i => i.status === "question" && i.askBy !== "you").length;
-  $("#s-you").replaceChildren("Needs you: ", el("b", { text: String(you) }));
-  $("#s-doing").replaceChildren("In progress: ", el("b", { text: String(cl.filter(c => c.lane === "doing").length) }));
-  $("#s-testing").replaceChildren("In testing: ", el("b", { text: String(cl.filter(c => c.lane === "testing").length) }));
-  $("#s-review").replaceChildren("Ideas in review: ", el("b", { text: String(il.filter(i => (i.status || "reviewing") === "reviewing").length) }));
-  $("#s-updated").textContent = meta.updated ? "Updated by " + (meta.updatedBy || "Claude") + " " + when(meta.updated) : "";
-  if (meta.name) { $("#proj-name").textContent = meta.name; }
-  if (meta.lede) $("#proj-lede").textContent = meta.lede;
+/* ---------- Render (never while you are typing or choosing) ---------- */
+let pending = false;
+const typing = () => { const a = document.activeElement; return !!a && /^(TEXTAREA|SELECT|INPUT)$/.test(a.tagName) && !!a.closest("#groups, .add"); };
+function render() {
+  renderStrip();
+  if (typing()) { pending = true; return; }
+  pending = false; renderGroups();
+  if (refocus) { const t = document.getElementById(refocus); refocus = null; if (t) t.focus({ preventScroll: true }); }
 }
-function render() { renderStrip(); renderBoard(); renderFilters(); renderIdeas(); }
+let rq = 0;
+function scheduleRender() { clearTimeout(rq); rq = setTimeout(render, 30); }
+document.addEventListener("focusout", () => { if (pending) setTimeout(() => { if (pending && !typing()) render(); }, 200); });
 render();
 
 (async () => {
-  if (!window.claude || !window.claude.use) { setStatus("Open this page on claude.ai to see the live board."); canWrite = false; render(); return; }
-  [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
-  if (!db) { setStatus("The live board isn't available in this view. Sign in to claude.ai to see it."); canWrite = false; render(); return; }
-  const may = user ? await user.can("data.write") : null;
-  if (may === false) { canWrite = false; setStatus("View only. Ask the owner for Contributor access to vote and add ideas."); }
-  else setStatus("Live. Changes save as you make them and show up for the team right away.");
-  const sub = (name, apply) => db.collection(name).onSnapshot(snap => {
-    const next = {}; for (const d of snap.docs) next[d.id] = d.data() || {};
-    apply(next); render();
-  }, () => setStatus("Live updates stopped. Reload the page to see the latest."));
-  sub("cards", v => { cards = v; });
-  sub("ideas", v => { ideas = v; });
-  db.doc("meta/project").onSnapshot(d => { meta = (d && d.exists !== false && d.data && d.data()) || {}; render(); }, () => {});
+  try {
+    if (!window.claude || !window.claude.use) { setStatus("Open this page on claude.ai to see the live board."); canWrite = false; loaded.cards = loaded.ideas = true; render(); return; }
+    [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    if (!db) { setStatus("The live board isn't available in this view. Sign in to claude.ai to see it."); canWrite = false; loaded.cards = loaded.ideas = true; render(); return; }
+    let may = null; try { may = user ? await user.can("data.write") : null; } catch {}
+    if (may === false) { canWrite = false; setStatus("View only. Ask the owner for Contributor access to answer and add ideas."); }
+    else setStatus("Live. Changes save as you make them and show up for the team right away.");
+    const sub = (name, apply) => db.collection(name).onSnapshot(snap => {
+      const next = {}; for (const d of snap.docs) next[d.id] = d.data() || {};
+      apply(next); loaded[name] = true; scheduleRender();
+    }, () => setStatus("Live updates stopped. Reload the page to see the latest."));
+    sub("cards", v => { cards = v; });
+    sub("ideas", v => { ideas = v; });
+    const one = (path, apply) => db.doc(path).onSnapshot(d => { apply((d && d.exists !== false && d.data && d.data()) || null); scheduleRender(); }, () => {});
+    one("meta/project", v => { meta = v || {}; });
+    one("meta/groomPlan", v => { plan = v; });
+  } catch (e) {
+    canWrite = false; loaded.cards = loaded.ideas = true;
+    setStatus("The board couldn't start (" + (e && e.message || "unknown error") + "). Reload the page to try again."); render();
+  }
 })();
-setInterval(renderStrip, 60000);
+setInterval(() => { if (!typing()) render(); }, 60000);
 </script>
