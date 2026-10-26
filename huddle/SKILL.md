@@ -1,7 +1,7 @@
 ---
 name: huddle
 description: Shared project board (work, idea reviews, grooming) that the human, Claude and role agents keep updated. Use when the user types /huddle (new, sync, review, groom, idea, issue), asks to create, sync, review or tidy the project board, wants agents to weigh in on ideas, or starts a work session on a project whose CLAUDE.md has a "Huddle board" line.
-argument-hint: "[new | sync | review [ids] | groom [apply|undo] | idea <text> | issue <text>]"
+argument-hint: "[new | sync | review [ids] | groom [apply|undo] | idea <text> | issue <text> | update]"
 ---
 
 # Huddle
@@ -29,6 +29,14 @@ Each has a `/huddle-<name>` shortcut skill that just calls the matching section 
 - `/huddle groom` — propose merges, archives and lane fixes (writes a plan; changes no card).
   `/huddle groom apply` applies only what the human approved. `/huddle groom undo` reverts the last apply.
 - `/huddle idea <text>` / `/huddle issue <text>` — add one quickly (idea → `ideas/`, issue → a Reported card).
+- `/huddle update` — check for a newer release and install it only after the user confirms (the `huddle-update` skill
+  holds the procedure: backup, changelog, rollback).
+
+## Step 0 of every command: the quiet update check
+Before running any `/huddle` command, do the **Check** section of the `huddle-update` skill: at most one cached lookup
+a day, silent when current or offline, one line when a newer release exists, and it never installs, downloads or
+edits anything but its cache file. Then carry on with what the user asked. Installing is only ever `/huddle update`.
+Skip step 0 if `VERSION` is missing next to this file (a development clone).
 
 ## Data (artifact db) — schema v2
 - `meta/project`: `{name, lede?, updated, updatedBy, lastSyncAt, lastGroom?: {at, merged, archived, moved}, schemaVersion: 2}`

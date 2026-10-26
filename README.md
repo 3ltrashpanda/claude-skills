@@ -108,11 +108,32 @@ One column, no horizontal page scroll, lane chips in a single scrolling row, and
 /huddle groom apply    apply only what you approved on the page
 /huddle groom undo     revert the last apply
 /huddle idea <text>    add an idea          /huddle issue <text>   report an issue
+/huddle update         check for a newer release; installs only after you confirm
 ```
 
 Each command also exists as its own skill (`/huddle-new`, `/huddle-sync`, `/huddle-review`, `/huddle-groom`,
-`/huddle-idea`, `/huddle-issue`), so typing `/huddle` in Claude Code lists them all with their argument hints. They are
+`/huddle-idea`, `/huddle-issue`, `/huddle-update`), so typing `/huddle` in Claude Code lists them all with their argument hints. They are
 thin shortcuts: all the rules live in `huddle/SKILL.md`.
+
+### Updates (notify, review, confirm)
+
+Releases are git tags (`v1.0.0`, …) with a [CHANGELOG](CHANGELOG.md). **Nothing updates itself**: the skill text is
+instructions Claude follows and `board.html` is code that runs in your artifact, so a silent pull from GitHub would be a
+supply-chain risk.
+
+- At the start of any `/huddle` command Claude does a quiet, cached check (one `git ls-remote --tags` a day, about half a
+  second). If a newer release exists it prints one line: `huddle 1.1.0 is available (you have 1.0.0). Run /huddle-update
+  to review the changes.` Offline or current: silence.
+- `/huddle-update` fetches the **tagged release** (never `main`), shows the changelog entries and which files change
+  (flagging `SKILL.md` and `board.html`, and any board-schema change), then installs **only if you say yes**. It first
+  backs up what it replaces to `~/.claude/skills/.huddle-backup/<version>/`, verifies the install, and tells you to start
+  a new session (the current one keeps the instructions it already loaded).
+- `/huddle-update rollback` restores the backup; `/huddle-update skip` silences the notice for that version.
+- If the update changed the board page, Claude offers to republish your board with it on the next sync (your data is
+  untouched). Existing boards are migrated on the next `/huddle sync` when a release changes the board schema.
+
+Want fully automatic updates instead? Claude Code plugins support that (off by default, enabled per marketplace), but a
+plugin renames the commands (`/huddle:sync`) and applies updates without review, so this repo doesn't ship as one yet.
 
 ### Install
 
@@ -147,7 +168,8 @@ enabled (the board uses the artifact database). The board is private until you s
 
 - `huddle/SKILL.md`: the instructions: data model (schema v2), claims, sync rules, groom, review, agent report format.
 - `huddle/board.html`: the board page template (`{{PROJECT}}` is replaced on `/huddle new`).
-- `huddle-*/SKILL.md`: one-line shortcut skills, one per command.
+- `huddle/VERSION`: the installed release (`version`, `boardSchema`, `minBoardSchema`). `CHANGELOG.md`: release notes.
+- `huddle-*/SKILL.md`: one-line shortcut skills, one per command; `huddle-update` holds the update procedure.
 - `docs/`: the screenshots above and `make-preview.js`, which builds the demo preview.
 
 ### Regenerate the screenshots
